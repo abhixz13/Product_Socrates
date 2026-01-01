@@ -1,5 +1,7 @@
 # PM Thought Partner 🥊
 
+> 🔱 **Forked from [breethomas/pm-thought-partner](https://github.com/breethomas/pm-thought-partner)**
+
 **Your sparring partner, not your assistant.**
 
 A Claude Code plugin that helps product teams make better decisions by combining proven PM frameworks with institutional memory.
@@ -390,4 +392,5 @@ Exploring what PM Thought Partner could become. These aren't commitments—they'
 
 MIT License. All frameworks attributed to original creators in [sources.yml](sources.yml).
 
-Built with Claude Code by [Bree Thomas](https://github.com/breethomas)
+Built with Claude Code by [Bree Thomas](https://github.com/breethomas).
+Fork maintained by [abhixz13](https://github.com/abhixz13).
