@@ -5,7 +5,7 @@
 This is an **open-source Claude Code plugin** for product managers.
 It provides PM frameworks, slash commands, and thought partnership for product decisions.
 
-**Repository:** https://github.com/breethomas/pm-thought-partner
+**Repository:** 
 
 ## Technology Stack
 

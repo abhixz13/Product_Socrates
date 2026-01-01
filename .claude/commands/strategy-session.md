@@ -46,13 +46,298 @@ Show the PM you've done your homework:
 - Demonstrate you understand the project context
 - PM should feel you're coming prepared, not asking them to brief you
 
-**Only after gathering context, proceed to Opening.**
+**Only after gathering context, proceed to Product Memory Setup.**
+
+---
+
+### 0.5 Product Memory Setup (Optional - Before Opening)
+
+**Check if product memory is initialized. If not, skip this section and proceed to Opening.**
+
+#### 1. Check for team-product-memory repository
+
+```bash
+test -d ../team-product-memory && echo "EXISTS" || echo "NOT_FOUND"
+```
+
+**If NOT_FOUND:**
+- Skip product memory features for this session
+- Proceed with normal strategy session
+- Set `product_memory_enabled = false`
+
+**If EXISTS:**
+- Set `product_memory_enabled = true`
+- Proceed to step 2
+
+#### 2. Detect current product and area
+
+**Strategy:**
+- If only one product exists: Use that product
+- If only one area exists under that product: Use that area
+- If multiple products or areas: Prompt PM to select
+
+**Implementation:**
+```bash
+cd ../team-product-memory
+find products -name "config.yml" -path "*/areas/*/config.yml"
+```
+
+Parse the results and extract product/area names.
+
+**Get PM info from git:**
+```bash
+pm_email=$(git config user.email)
+pm_name=$(git config user.name)
+```
+
+**If PM's email is in multiple areas:**
+```
+I found your email in multiple product areas:
+1. intersight/monitoring
+2. intersight/foundation
+3. customer-os/platform
+
+Which area is this session for? (enter number or type product/area)
+```
+
+**Store for later use:**
+- `current_product`: e.g., "intersight"
+- `current_area`: e.g., "monitoring"
+- `pm_email`: from git config
+- `pm_name`: from git config
+
+#### 3. Pull latest team decisions
+
+Before session starts, sync with team repo:
+```bash
+cd ../team-product-memory
+git pull origin main 2>/dev/null || echo "Note: Could not pull from remote"
+```
+
+If pull fails (no remote), continue anyway with local repo.
+
+#### 4. Search team decision history for relevant past decisions
+
+**Extract topic/context from user's opening question or session context.**
+
+**Keyword extraction logic:**
+
+From the user's session topic or opening question:
+1. Remove stop words: "the", "is", "we", "should", "for", "a", "an", "to", "in", "on", "at", "of", "and", "or", "be", "can", "will", "would", "could", "do", "does"
+2. Convert to lowercase
+3. Keep words with length > 2
+4. Take max 10 keywords
+
+Examples:
+- "Should we build real-time collaboration?" → ["build", "real-time", "collaboration"]
+- "AI adoption is low" → ["ai", "adoption", "low"]
+- "Delay mobile app?" → ["delay", "mobile", "app"]
+
+**Search strategy (MVP - keyword matching):**
+
+```bash
+cd ../team-product-memory
+
+# Build grep pattern from keywords (e.g., "AI\|feature\|email")
+# Search decision files in expanding scope:
+
+# 1. Start with current area
+grep -rl "keyword1\|keyword2\|..." products/${product}/areas/${area}/decisions/*.md 2>/dev/null
+
+# 2. If less than 3 results, expand to all areas in same product
+grep -rl "keyword1\|keyword2\|..." products/${product}/areas/*/decisions/*.md 2>/dev/null
+
+# 3. If still less than 3, expand to all products (cross-product learning)
+grep -rl "keyword1\|keyword2\|..." products/*/areas/*/decisions/*.md 2>/dev/null
+```
+
+**Rank by relevance:**
+
+For each decision file found:
+1. **Count keyword matches** in file (grep -o to count occurrences)
+2. **Extract date** from YAML frontmatter
+3. **Calculate recency score**: days_ago from today
+4. **Check area match**: same area = +5 bonus, same product = +2 bonus
+5. **Combine score**: `(keyword_matches * 10) + max(0, 100 - days_ago) * 0.1 + area_bonus`
+
+Sort by score (highest first), take top 3 decisions.
+
+**Performance optimization:**
+- Limit search to first 10 matching files (use `head -10`)
+- Cache git pull (skip if pulled in last 5 minutes)
+- Timeout after 10 seconds total
+
+**If no decisions found:**
+- Set `relevant_decisions = []`
+- Skip surfacing
+- Continue to Opening
+
+**Empty state messages (choose based on scenario):**
+
+**Scenario 1: No decision files exist at all (new team):**
+```
+No team decisions found yet.
+
+This is your first strategy session - I'll help you capture your first decision!
+```
+
+**Scenario 2: Decisions exist, but none are relevant to topic:**
+```
+No past decisions found related to "[topic]".
+
+This might be a new area for your team. I'll help you explore it fresh.
+```
+
+**Scenario 3: Topic is too vague (< 2 keywords after filtering):**
+```
+I couldn't extract specific keywords from "[topic]".
+
+Starting the session fresh. As we explore, I'll reference relevant past decisions if they come up.
+```
+
+Then continue to Opening section.
+
+**If decisions found:**
+- Set `relevant_decisions = [decision1, decision2, decision3]`
+- Extract details from each decision file:
+  - Read YAML frontmatter (first 30 lines)
+  - Extract: `decision`, `pm_name`, `pm_email`, `date`, `status`, `product_area`
+  - Read markdown body sections: "Assumptions", "Trade-offs", "Success Criteria"
+- Proceed to step 5 (Memory Surfacing)
+
+**Edge cases:**
+- If session topic is too vague (< 2 keywords after filtering): Skip search
+- If search takes > 10 seconds: Timeout and skip surfacing
+- If decision file has missing fields: Extract from git blame or show "Unknown PM"
+
+#### 5. Memory Surfacing (If relevant decisions found)
+
+**Only if `relevant_decisions` array is not empty.**
+
+Display the top 3 relevant decisions to the PM:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RELEVANT HISTORY (from team memory)
+
+I found {number} past decision(s) that might inform this session:
+
+📌 1. {Decision Summary}
+   Who: {PM Name} ({PM Email})
+   When: {Date} ({X days/weeks/months ago})
+   Product Area: {product}/{area}
+   Outcome: {Pending / Success / Failed}
+
+   Key context:
+   • Assumptions: {First assumption from decision file}
+   • Trade-off: {Trade-off from decision file}
+   • Result: {Success criteria or outcome status}
+
+   [View full decision: products/{product}/areas/{area}/decisions/{filename}]
+
+📌 2. {Decision Summary}
+   ...
+
+📌 3. {Decision Summary}
+   ...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Would you like to:
+1. Review these decisions in detail (I'll summarize key learnings)
+2. Start the session (I'll keep these in mind as context)
+3. Ignore and start fresh
+```
+
+**Extracting decision details:**
+
+For each decision file:
+```bash
+# Read YAML frontmatter
+head -30 products/{product}/areas/{area}/decisions/{file}.md
+
+# Extract fields (look for lines starting with field names):
+# decision: "..."
+# pm_name: "..."
+# pm_email: "..."
+# date: YYYY-MM-DD
+# status: pending|success|failed|cancelled
+# product_area: "..."
+```
+
+**Cross-area decision display:**
+
+If decision is from a different area than current session:
+```
+📌 Decision from different team (but related):
+   Who: Sara Chen (Product PM)
+   Product Area: intersight/foundation  ← Note: Different area
+   Pattern: {Key learning from this decision}
+
+   This was a different team, but the learning might apply to your decision.
+```
+
+**Outcome status display:**
+
+Based on `status` field in YAML:
+- `pending`: "Outcome: Still pending (follow-up: {follow_up_date})"
+- `success`: "✅ Outcome: Success - {success criteria}"
+- `failed`: "❌ Outcome: Did not work - {outcome notes}"
+- `cancelled`: "⏸️ Outcome: Decision was reversed"
+
+**Handle PM selection:**
+
+**If PM chooses 1 (Review details):**
+- For each of the 3 decisions, read and display full markdown content
+- Summarize key learnings: "Here's what I noticed..."
+- Then ask: "Ready to start the session with this context?"
+
+**If PM chooses 2 (Start session):**
+- Store `surfaced_decisions` for reference during exploration
+- Set `reference_decisions_in_opening = true`
+- Continue to Opening (section 1)
+
+**If PM chooses 3 (Ignore):**
+- Clear `surfaced_decisions`
+- Set `reference_decisions_in_opening = false`
+- Continue to Opening (section 1)
+
+#### 6. Continue to Opening
+
+After memory surfacing (or skipping if no decisions), proceed with Opening section below.
 
 ---
 
 ### 1. Opening (30 seconds)
 
-Acknowledge the project context you've gathered and set clear expectations:
+Acknowledge the project context you've gathered and set clear expectations.
+
+**If decisions were surfaced and PM chose to start with context (option 2):**
+
+```
+"I've reviewed [project name] - [brief 1-sentence summary showing you understand it].
+
+I see you're exploring: [topic]
+
+Based on your team's past decisions, I noticed:
+• [Pattern from surfaced decisions - e.g., "Your team has tried AI features before"]
+• [Key learning - e.g., "Domain-specific AI performed better than generic"]
+
+I'll keep these patterns in mind as we explore today.
+
+Let's think through [topic] together.
+
+I'll help you explore:
+- What problem this solves
+- Key risks and tradeoffs
+- What to prototype first
+- Open questions to investigate
+
+Start talking whenever you're ready. I'll ask questions as we go,
+and capture everything at the end."
+```
+
+**If no decisions were surfaced OR PM chose to ignore them:**
 
 ```
 "I've reviewed [project name] - [brief 1-sentence summary showing you understand it].
@@ -140,6 +425,290 @@ Want me to:
 3. Continue exploring something else
 4. Wrap up
 ```
+
+### 3.5 Decision Capture (Product Memory)
+
+**Only if `product_memory_enabled = true` (from step 0.5).**
+
+After showing the session summary, add decision capture flow:
+
+#### 1. Decision Detection
+
+Analyze the session conversation for:
+- **Commitments to action:** "I'm going to...", "We will...", "Let's..."
+- **Trade-off resolutions:** "We chose X over Y because..."
+- **Feature prioritization:** "We're doing X first, Y later"
+- **Go/No-Go decisions:** "We're not building X", "We're saying no to Y"
+- **Approach selections:** "We'll use approach A instead of B"
+
+**Rules:**
+- Minimum 1 decision, maximum 5 per session (more = overwhelming)
+- Each decision should be actionable (not just insights)
+- Focus on concrete decisions with impact
+
+**Present to PM:**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DECISION CAPTURE
+
+I noticed you made these decisions today:
+1. [Decision 1 - one sentence summary]
+2. [Decision 2 - one sentence summary]
+3. [Decision 3 - one sentence summary]
+
+Should I save these to your product memory for {current_product}/{current_area}? (y/n)
+
+If yes, I'll ask a few quick questions (3 min) to capture context.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**If PM says no:**
+- Skip decision capture
+- Continue to Linear Output or wrap up
+
+**If PM says yes:**
+- Proceed to Decision Context Q&A (step 2)
+
+**If no concrete decisions detected:**
+```
+I didn't detect any concrete decisions in this session - mostly exploration and questions.
+Should I still create a session record? (y/n)
+```
+
+#### 2. Decision Context Q&A
+
+**For each decision, ask these 4 questions conversationally:**
+
+```
+Let me capture the context for: {decision_summary}
+
+1️⃣ What assumptions are you making?
+   (What needs to be true for this to work?)
+
+   PM: [Response]
+
+2️⃣ What's the main trade-off here?
+   (What are you giving up or delaying?)
+
+   PM: [Response]
+
+3️⃣ When will we know if this worked?
+   (Timeline: 2 weeks, 1 month, 3 months?)
+
+   PM: [Response]
+
+4️⃣ What would success look like?
+   (Specific metrics or outcomes)
+
+   PM: [Response]
+```
+
+**Conversational guidelines:**
+- Keep it natural - don't say "Question 1 of 4"
+- Allow brief answers (2-3 sentences each)
+- If PM says "skip" or "I don't know", note as "TBD"
+- Total time: ~2-3 minutes for all questions per decision
+
+**After all questions answered:**
+```
+Got it. Saving {number} decision(s) to team memory...
+```
+
+#### 3. Generate Decision Files
+
+**For each decision:**
+
+**Filename format:**
+```
+../team-product-memory/products/{product}/areas/{area}/decisions/{YYYY-MM-DD}-{slug}.md
+```
+
+**Slug generation:**
+- Take first 5 words of decision summary
+- Convert to lowercase, replace spaces with hyphens
+- Remove special characters
+- Max 50 characters
+
+**File template:**
+```yaml
+---
+decision_id: "{YYYY-MM-DD}-{slug}"
+product_id: "{product}"
+product_area: "{area}"
+date: {YYYY-MM-DD}
+pm_email: "{pm_email}"
+pm_name: "{pm_name}"
+decision: "{decision_summary}"
+status: "pending"
+timeline: "{timeline_from_q3}"
+follow_up_date: {YYYY-MM-DD_calculated_from_timeline}
+tags: []
+---
+
+# Decision: {decision_summary}
+
+**Date:** {Month DD, YYYY}
+**Status:** Pending
+**Follow-up:** {follow_up_date_formatted}
+**PM:** {pm_name} ({pm_email})
+
+## Rationale
+
+{Why this decision was made - from session context}
+
+## Assumptions
+
+{Answer from Q1, formatted as bullet list}
+
+## Trade-offs
+
+{Answer from Q2}
+
+## Context
+
+{Relevant context from session - product state, customer feedback, competitive pressure, etc.}
+
+## Success Criteria
+
+{Answer from Q4}
+
+## Timeline
+
+{Answer from Q3}
+
+**Expected completion:** {follow_up_date}
+
+## Related Decisions
+
+None yet (first decision in this area!)
+
+---
+
+*Decision captured from strategy session*
+*Product Memory - Team: {product}/{area}*
+```
+
+**Follow-up date calculation:**
+```bash
+# Based on timeline from Q3:
+# "2 weeks" → add 14 days
+# "1 month" → add 30 days
+# "3 months" → add 90 days
+# "Q2" → calculate end of Q2
+# "TBD" → 30 days from now (default)
+
+# macOS:
+date -v+14d +%Y-%m-%d
+
+# Linux:
+date -d "+14 days" +%Y-%m-%d
+```
+
+**Edge cases:**
+- If slug collision exists → append `-2`, `-3`, etc.
+- If timeline is unparseable → default to 30 days
+
+#### 4. Git Auto-Commit and Push
+
+**After all decision files created:**
+
+```bash
+cd ../team-product-memory
+
+# Add all new decision files
+git add products/{product}/areas/{area}/decisions/*.md
+
+# Commit with descriptive message
+git commit -m "Decision: {first_decision_summary}
+
+Added by: {pm_name} ({pm_email})
+Product: {product}
+Area: {area}
+Decisions: {number_of_decisions}
+
+Session date: {YYYY-MM-DD}"
+
+# Try to push (handle errors gracefully)
+git push origin main 2>&1
+```
+
+**Error handling:**
+
+**If push fails (no remote):**
+```
+✅ Decisions saved locally to team-product-memory/
+
+⚠️ No remote repository configured.
+
+To share with your team:
+1. Set up a remote: git remote add origin <repo-url>
+2. Push: git push -u origin main
+3. Team members can then: git clone <repo-url>
+```
+
+**If push fails (merge conflict):**
+```
+⚠️ Could not push - someone else made changes.
+
+Attempting to resolve...
+```
+
+Try to resolve:
+```bash
+git pull --rebase origin main
+git push origin main
+```
+
+**If rebase fails:**
+```
+❌ Merge conflict detected.
+
+Your decisions are saved locally. To sync with team:
+1. cd ../team-product-memory
+2. git pull origin main
+3. Resolve conflicts manually
+4. git push origin main
+
+Your local files are safe at:
+  products/{product}/areas/{area}/decisions/
+```
+
+**If push succeeds:**
+```
+✅ {number} decision(s) pushed to team memory
+
+Saved to: products/{product}/areas/{area}/decisions/
+Team members will see these after: git pull
+```
+
+#### 5. Update Session Summary
+
+**After decision capture, update the summary shown to PM:**
+
+```markdown
+📝 TEAM DECISION MEMORY
+✅ Saved {number} decision(s) to team repo
+   Product: {product} / Area: {area}
+   Files: products/{product}/areas/{area}/decisions/
+   Team members: {count} active PMs can see these
+
+Want me to:
+1. Create Linear issues for prototypes + investigations
+2. Save this session summary
+3. Continue exploring
+4. Wrap up
+```
+
+**If decision capture was skipped (PM said no):**
+```markdown
+Want me to:
+1. Create Linear issues for prototypes + investigations
+2. Save this session summary
+3. Continue exploring
+4. Wrap up
+```
+
+---
 
 ### 4. Linear Output (1 minute)
 

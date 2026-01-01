@@ -1,12 +1,141 @@
 # PM Thought Partner 🥊
 
-**Your sparring partner, not your assistant.** 
+**Your sparring partner, not your assistant.**
 
-**Built on publicly available frameworks from leading product thinkers.**
+A Claude Code plugin that helps product teams make better decisions by combining proven PM frameworks with institutional memory.
 
-Claude Code plugin that applies proven PM frameworks to real product decisions. Challenges assumptions. Asks tough questions. Pushes you toward prototypes over docs.
+---
 
-Opinionated. Curated for prototype-first, AI-era product work.
+## The Problem
+
+**Product decisions don't compound.**
+
+When Sarah leaves the team, her hard-won insights about what worked (and what didn't) leave with her. When Jordan joins, they repeat the same mistakes Sarah already learned from. Every PM starts from scratch.
+
+Meanwhile, you're in back-to-back meetings, context-switching between projects, trying to remember: "Didn't we try something like this before? How did it go?"
+
+**The result:** Teams keep stepping on the same rakes.
+
+## The North Star
+
+**Decisions should compound across your team, not evaporate when people change.**
+
+Imagine if:
+- New PMs inherited 6 months of institutional knowledge on Day 1
+- Strategy sessions referenced what your team already learned
+- You could see patterns: "We validated 8 features with prototypes—85% shipped. We validated 5 with just interviews—20% shipped."
+- Cross-team learning happened automatically: "Platform team learned this 3 months ago..."
+
+That's what we're building.
+
+## How It Works
+
+**Two systems working together:**
+
+### 1. Strategic Thinking Partner (Proven PM Frameworks)
+
+Built on publicly available frameworks from Marty Cagan, Teresa Torres, Brian Balfour, and other leading product thinkers. Challenges your assumptions. Pushes toward prototypes over docs. Applies frameworks naturally in conversation.
+
+**Commands:** `/strategy-session`, `/reflect`, `/four-risks`, `/now-next-later`, etc.
+
+### 2. Product Memory (Team Institutional Knowledge)
+
+Git-based decision tracking that captures what you decided, why, and what happened. Automatically surfaces relevant past decisions during strategy sessions. Cross-PM learning built in.
+
+**Commands:** `/memory-init` (Phase 1 ✅), decision capture in sessions (Phase 2 ✅), memory surfacing (Phase 3 ✅)
+
+**Together:** Get both strategic frameworks AND your team's lived experience in every decision.
+
+---
+
+## Implementation Status
+
+### ✅ Phase 1: Multi-Tenant Foundation
+**Command:** `/memory-init`
+
+Initialize team decision memory with multi-tenant structure:
+- One product can have multiple areas (e.g., Intersight → Monitoring, Foundation, Automation)
+- Each area has its own team and decisions
+- Git-based for collaboration and version control
+- Simple, local-first (no database, no server)
+
+**Status:** Complete
+
+---
+
+### ✅ Phase 2: Team Decision Capture
+**Integration:** `/strategy-session` enhancement
+
+Automatically capture decisions during strategy sessions:
+- AI detects concrete decisions in conversation
+- Guided 4-question Q&A captures context (assumptions, trade-offs, timeline, success criteria)
+- Generates decision files with YAML frontmatter
+- Auto-commits to team git repo
+- Multi-tenant attribution (product, area, PM)
+
+**What gets saved:**
+```yaml
+decision: "Build AI email assistant with domain templates"
+pm_name: "Sara Chen"
+date: 2024-12-01
+status: "success"
+assumptions: ["Users want domain-aware AI"]
+trade_offs: "Delayed mobile app 1 month"
+outcome: "40% adoption (exceeded 30% goal)"
+```
+
+**Status:** Complete
+
+---
+
+### ✅ Phase 3: Team-Wide Memory Surfacing
+**Integration:** `/strategy-session` enhancement
+
+Before starting a new session, Claude automatically:
+1. Syncs with team decision repository
+2. Searches for relevant past decisions (keyword-based)
+3. Surfaces top 3 with full context:
+   - Who made it (PM name, email)
+   - When (relative time)
+   - Outcome (success/pending/failed)
+   - Key learnings (assumptions, trade-offs, results)
+4. References these patterns during exploration
+
+**Cross-PM learning enabled:**
+- Platform PMs see Product PM decisions
+- Same product, different areas share learnings
+- "We tried this before" intelligence built-in
+
+**Example output:**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RELEVANT HISTORY (from team memory)
+
+📌 Build AI email assistant (Sara Chen, Dec 1)
+   Outcome: ✅ Success - 40% adoption
+   Learning: Domain-specific AI > Generic (73% lift)
+```
+
+**Status:** Complete (MVP - keyword search, simple ranking, < 10s performance)
+
+---
+
+### ⏳ Next: Phase 4 - Outcome Tracking
+
+Follow-up prompts when decisions mature:
+- "How did that AI feature work out?"
+- Update status: pending → success/failed
+- Capture what actually happened
+- Build pattern recognition: "Prototypes work 85% of the time for us"
+
+**Timeline:** 1 week
+
+---
+
+### Future Phases
+- **Phase 5:** Weekly decision journal
+- **Phase 6:** Pattern recognition across decisions
+- **Post-MVP:** Semantic search, decision graphs, analytics
 
 ---
 
@@ -31,25 +160,43 @@ The PM Thought Partner synthesizes publicly available frameworks from:
 
 ---
 
-## What This Does
+## Core Commands
 
-### Strategic Thinking Partner
+### `/strategy-session` - Strategic Thinking Partner
 
-**`/strategy-session` - Your product soundboard**
+Work through product problems conversationally. Claude gathers context proactively, applies PM frameworks naturally, and now surfaces your team's past decisions.
 
-Work through product problems conversationally. Claude gathers project context proactively (reads your README, commits, architecture), then asks probing questions that apply PM frameworks naturally.
-
-- Feature planning and validation
-- Risk assessment
-- Roadmap decisions
-- "Should we build this?" conversations
-
-**What you get:**
-- Strategic conversation that adapts to your problem
-- Structured capture: decisions, risks, prototypes, open questions
-- Actionable Linear issues created from insights
+**Features:**
+- Proactive context gathering (README, commits, architecture)
+- Framework-driven exploration (Four Risks, Continuous Discovery, etc.)
+- Decision capture with guided Q&A (Phase 2 ✅)
+- Team memory surfacing before each session (Phase 3 ✅)
+- Structured output: decisions, risks, prototypes, questions
+- Optional Linear issue creation
 
 **Start:** `/strategy-session` or `/strategy-session "recommendation engine"`
+
+---
+
+### `/memory-init` - Initialize Team Decision Memory
+
+One-time setup to create your team's decision repository (Phase 1 ✅).
+
+Creates multi-tenant git structure:
+```
+team-product-memory/
+└── products/
+    └── intersight/              # Your product
+        ├── config.yml
+        └── areas/               # Product areas
+            ├── monitoring/      # Area 1 (PM team)
+            ├── foundation/      # Area 2 (PM team)
+            └── automation/      # Area 3 (PM team)
+```
+
+**Start:** `/memory-init`
+
+---
 
 ### Strategic Reflection
 
